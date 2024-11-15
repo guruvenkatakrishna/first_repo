@@ -1,0 +1,89 @@
+write a pipeline using all the tools (git,maven.sonarqube,jenkins,jfrog.)
+
+
+pipeline {
+    agent any
+
+    environment {
+        // Add any necessary environment variables
+        MAVEN_HOME = "/usr/share/maven"     // Specify Maven path if needed
+        JAVA_HOME = "/usr/lib/jvm/java-17"       // Specify Java path if needed
+    }
+
+    tools {
+        maven 'Maven' // Ensure Maven is set up in Jenkins Global Tools
+    }
+
+    stages {
+        stage('Checkout') {
+            steps {
+                // Cloning code from Git repository
+                git branch: 'main', url: 'https://github.com/java-example.git'
+            }
+        }
+
+        stage('Build') {
+            steps {
+                // Running Maven build
+                sh 'mvn clean install'
+            }
+        }
+
+        stage('Code Quality Analysis') {
+            steps {
+                // Running SonarQube analysis
+                script {
+                    withSonarQubeEnv('SonarQube') { // Replace 'SonarQube' with the name configured in Jenkins
+                        sh 'mvn sonar:sonar'
+                    }
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                // Running tests with Maven
+                sh 'mvn test'
+            }
+
+            post {
+                always {
+                    // Archiving test results
+                    junit 'target/surefire-reports/*.xml'
+                }
+            }
+        }
+
+        stage('Artifact Upload') {
+            steps {
+                // Uploading artifact to JFrog Artifactory
+                script {
+                    def server = Artifactory.server 'JFrog'  // Replace 'JFrog' with your Artifactory server ID in Jenkins
+                    def uploadSpec = """{
+                        "files": [
+                            {
+                                "pattern": "target/*.war",
+                                "target": "/home/ubuntu/tomcat/webapps/"
+			    }
+			]
+	        }"""	
+            }
+         }
+	stage('Deploy'){
+		steps { 
+			sh 'echo "deploying application" '
+		}
+	}
+post {
+      always{
+	   cleanWs()	//it will show the o/p or pipeline outcome wether the build is succedd or failed and cleanup the workspace
+      }
+      success{
+		echo 'pipeline executed successfully'
+      }
+      failure{
+		echo 'pipeline failed checked log for details'
+      }
+
+}
+
